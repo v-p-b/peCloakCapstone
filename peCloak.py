@@ -31,7 +31,6 @@ Please note the external code dependencies: pydasm, pefile, SectionDoubleP
 import os, sys, getopt
 import pefile
 import capstone
-#import pydasm
 import re
 import binascii 
 import struct
