@@ -1130,7 +1130,7 @@ def main(argv):
 	disable_aslr(pe)
 
 	# get our code cave location information
-	pe, code_cave_address, code_cave_virtual_offset, code_cave_raw_offset, code_cave_section = get_code_cave(pe, skip_cave_search);print "[!!] Code cave virtual offset: %s" % repr(code_cave_virtual_offset)
+	pe, code_cave_address, code_cave_virtual_offset, code_cave_raw_offset, code_cave_section = get_code_cave(pe, skip_cave_search)
 	
 	# print section information
 	get_sections(pe)
