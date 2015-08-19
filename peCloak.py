@@ -30,7 +30,8 @@ Please note the external code dependencies: pydasm, pefile, SectionDoubleP
 
 import os, sys, getopt
 import pefile
-import pydasm
+import capstone
+#import pydasm
 import re
 import binascii 
 import struct
@@ -217,7 +218,8 @@ def save_cloaked_pe(pe, file):
     try:
         ts = int(time.time())
         fname = os.path.splitext(file)[0] + "_" + str(ts) + "_cloaked.exe"
-        pe.write(pe.OPTIONAL_HEADER.SizeOfHeaders, filename=fname) # MODIFIED WRITE FUNCTION IN PEFILE!!!
+        print "[*] Saving %s" % (fname)
+        pe.write(filename=fname) # New pefile seems to have the header size issue resolved (?)
         print "[*] New file saved [" + fname + "]"	
     except:
         print "[!] ERROR: Could not save modified PE file. Check write permissions and ensure the file is not in use"
@@ -731,12 +733,14 @@ def encode_data(pe, section_to_encode, encoder):
 def preserve_entry_instructions(pe, ep, ep_ava, offset_end):
 	offset=0
 	original_instructions = pe.get_memory_mapped_image()[ep:ep+offset_end+30]
-	print "[*] Preserving the following entry instructions (at entry address %s):" % hex(ep_ava)
-	while offset < offset_end:
-		i = pydasm.get_instruction(original_instructions[offset:], pydasm.MODE_32)
-		asm = pydasm.get_instruction_string(i, pydasm.FORMAT_INTEL, ep_ava+offset)
-		print "\t[+] " + asm
-		offset += i.length
+	md=capstone.Cs(capstone.CS_ARCH_X86,capstone.CS_MODE_32)
+	md_iter=md.disasm(original_instructions,ep_ava)
+	print "[*] Preserving the following entry instructions (at entry address %s, end offset %x):" % (hex(ep_ava),offset_end)
+	for i_caps in md.disasm(original_instructions,ep_ava):
+		asm_caps = "%s %s" % (i_caps.mnemonic,i_caps.op_str)
+		print "\t[+] %s (%d) " % (asm_caps,len(i_caps.bytes))
+		offset += len(i_caps.bytes)
+		if offset>=offset_end: break
 		
 	# re-get instructions with confirmed offset to avoid partial instructions
 	original_instructions = pe.get_memory_mapped_image()[ep:ep+offset]
@@ -791,15 +795,13 @@ def modify_entry_instructions(ep_ava, original_instructions, heuristic_decoder_o
 	current_offset = 0
 	prior_offset = 0
 	added_bytes = 0
-	while current_offset < len(original_instructions):
-	
-		# get the asm for each instruction
-		i = pydasm.get_instruction(original_instructions[current_offset:], pydasm.MODE_32)
-		asm = pydasm.get_instruction_string(i, pydasm.FORMAT_INTEL, ep_ava+current_offset)
-		
+	md=capstone.Cs(capstone.CS_ARCH_X86,capstone.CS_MODE_32)
+	for i in md.disasm(original_instructions,ep_ava):
+		asm="%s %s" % (i.mnemonic,i.op_str)
+		print "[capstone] asm = %s" % repr(asm)
 		# increment counters
 		prior_offset = current_offset
-		current_offset += i.length 
+		current_offset += len(i.bytes) 
 		
 		instruct_bytes = original_instructions[prior_offset:current_offset] # grab current instruction bytes
 		opcode = binascii.hexlify(instruct_bytes[0]) # extract first opcode byte
@@ -1129,7 +1131,7 @@ def main(argv):
 	disable_aslr(pe)
 
 	# get our code cave location information
-	pe, code_cave_address, code_cave_virtual_offset, code_cave_raw_offset, code_cave_section = get_code_cave(pe, skip_cave_search)
+	pe, code_cave_address, code_cave_virtual_offset, code_cave_raw_offset, code_cave_section = get_code_cave(pe, skip_cave_search);print "[!!] Code cave virtual offset: %s" % repr(code_cave_virtual_offset)
 	
 	# print section information
 	get_sections(pe)
