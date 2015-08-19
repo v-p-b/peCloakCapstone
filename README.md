@@ -1,7 +1,7 @@
 peCloak - Capstone
 ==================
 
-This is a simple fork of [SecuritySwift's peCloak](http://www.securitysift.com/pecloak-py-an-experiment-in-av-evasion/) that uses [Capstone](http://www.capstone-engine.org). The intention is to provide a fork based on a well-maintained, up-to-date disassembly library and to make the script multi-platform.
+This is a simple fork of [SecuritySift's peCloak](http://www.securitysift.com/pecloak-py-an-experiment-in-av-evasion/) that uses [Capstone](http://www.capstone-engine.org). The intention is to provide a fork based on a well-maintained, up-to-date disassembly library and to make the script multi-platform.
 
 Here's what I did so far:
   * Replaced pydasm with Capstone
